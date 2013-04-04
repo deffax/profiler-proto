@@ -85,3 +85,44 @@ CallstackNode* CallstackNode::getChildByName(const char name_[])
 		return node;
 	}
 }
+
+
+CallstackProfiler::CallstackProfiler()
+	: enable(false), mRootNode(nullptr), mCurrentNode(nullptr)
+{
+}
+
+CallstackProfiler::~CallstackProfiler()
+{
+	setRootNode(nullptr);
+}
+
+void CallstackProfiler::setRootNode(CallstackNode* root)
+{
+	mCurrentNode = mRootNode = root;
+}
+
+void CallstackProfiler::begin(const char name[])
+{
+	if(!enable)
+		return;
+	CallstackNode* node = mCurrentNode;
+	if(name != node->name)
+	{
+		node = node->getChildByName(name);
+		if(node->recursionCount == 0)
+			mCurrentNode = node;
+	}
+	node->begin();
+	node->recursionCount++;
+}
+
+void CallstackProfiler::end()
+{
+	if(!enable)
+		return;
+	mCurrentNode->recursionCount--;
+	mCurrentNode->end();
+	if(mCurrentNode->recursionCount == 0)
+		mCurrentNode = mCurrentNode->parent;
+}
