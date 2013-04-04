@@ -24,3 +24,22 @@ public:
 	CallstackNode* sibling;
 	CallstackNode* firstChild;
 };
+
+class CallstackProfiler : private NonCopyable
+{
+public:
+	CallstackProfiler();
+	~CallstackProfiler();
+
+	virtual void begin(const char name[]);
+	virtual void end();
+
+	void setRootNode(CallstackNode* root);
+	CallstackNode* getRootNode() { return mRootNode;}
+	CallstackNode* getCurrentNode() {return mCurrentNode;}
+
+	bool enable;
+protected:
+	CallstackNode* mRootNode;
+	CallstackNode* mCurrentNode;
+};
