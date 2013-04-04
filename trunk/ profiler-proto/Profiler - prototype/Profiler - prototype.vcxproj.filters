@@ -21,12 +21,18 @@
     <ClCompile Include="CallstackProfiler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="MemoryProfiler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="NonCopyable.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="CallstackProfiler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MemoryProfiler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -78,9 +78,11 @@
   <ItemGroup>
     <ClCompile Include="CallstackProfiler.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="MemoryProfiler.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CallstackProfiler.h" />
+    <ClInclude Include="MemoryProfiler.h" />
     <ClInclude Include="NonCopyable.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
