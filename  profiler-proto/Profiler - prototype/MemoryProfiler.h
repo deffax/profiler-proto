@@ -1,6 +1,9 @@
 #pragma once
 #include "CallstackProfiler.h"
 #include <mutex>
+#include <vector>
+#include <chrono>
+
 
 class MemoryProfilerNode : public CallstackNode
 {
@@ -32,8 +35,16 @@ public:
 	class Scope;
 	static MemoryProfiler& singleton();
 
+	void setRootNode(CallstackNode* root);
+
 	void begin(const char name[]);
 	void end();
+
+	
+
+protected:
+	struct TlsList;
+	TlsList* mTlsList;
 };
 
 
