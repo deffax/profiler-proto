@@ -1,5 +1,6 @@
 #pragma once
 #include "CallstackProfiler.h"
+#include <mutex>
 
 class MemoryProfilerNode : public CallstackNode
 {
@@ -10,7 +11,17 @@ public:
 	void begin();
 	CallstackNode* createNode(const char name[], CallstackNode* parent);
 
+	size_t inclusiveCount() const;
+	size_t inclusiveBytes() const;
+
+	void reset();
+
+	size_t exclusiveCount;
+	size_t exclusiveBytes;
 	size_t callCount;
+	size_t countSinceLastReset;
+	bool mIsMutexOwner;
+	std::recursive_timed_mutex mMutex;
 };
 
 class MemoryProfiler : public CallstackProfiler
@@ -26,7 +37,7 @@ public:
 };
 
 
-class MemoryProfiler::Scope
+class MemoryProfiler::Scope 
 {
 public:
 	Scope(const char name[])
@@ -39,3 +50,4 @@ public:
 		MemoryProfiler::singleton().end();
 	}
 };
+
