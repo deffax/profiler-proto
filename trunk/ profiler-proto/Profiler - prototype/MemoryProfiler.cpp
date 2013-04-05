@@ -1,4 +1,5 @@
 #include "MemoryProfiler.h"
+#include <Windows.h>
 
 MemoryProfilerNode::MemoryProfilerNode(const char name[], CallstackNode* parent)
 	: CallstackNode(name, parent), callCount(0),
@@ -71,16 +72,81 @@ size_t MemoryProfilerNode::inclusiveBytes() const
 
 
 
+//TLS struct
+struct TlsStruct
+{
+	TlsStruct(const char* name) :
+		recurseCount(0),
+		mCurrentNode(nullptr), threadName(::_strdup(name))
+	{
+	}
+
+	~TlsStruct()
+	{
+		::free((void*) threadName);
+	}
+
+	MemoryProfilerNode* currentNode()
+	{
+		if(!mCurrentNode)
+		{
+			CallstackNode* rootNode = MemoryProfiler::singleton().getRootNode();
+			recurseCount++;
+			mCurrentNode = static_cast<MemoryProfilerNode*>(
+				rootNode->getChildByName(threadName));
+			recurseCount--;
+		}
+		return mCurrentNode;
+	}
+
+	MemoryProfilerNode* setCurrentNode(CallstackNode* node)
+	{
+		return mCurrentNode = static_cast<MemoryProfilerNode*>(node);
+	}
+
+	size_t recurseCount;
+	const char* threadName;
+protected:
+	MemoryProfilerNode* mCurrentNode;
+};
+
+DWORD gTlsIndex = 0;
+
+TlsStruct* getTlsStruct()
+{
+	return reinterpret_cast<TlsStruct*>(TlsGetValue(gTlsIndex));
+}
+
+struct MemoryProfiler::TlsList : public std::vector<TlsStruct*>
+{
+	
+	~TlsList()
+	{
+		for(iterator i = begin(); i!= end(); ++i)
+			delete(*i);
+	}
+	std::timed_mutex mMutex;
+};
+
 
 //Memory Profiler
 
 MemoryProfiler::MemoryProfiler()
 {
+	mTlsList = new TlsList();
+	gTlsIndex = TlsAlloc();
+
+	setRootNode(new MemoryProfilerNode("root"));
 }
 
 MemoryProfiler::~MemoryProfiler()
 {
 	CallstackProfiler::setRootNode(nullptr);
+}
+
+void MemoryProfiler::setRootNode(CallstackNode* root)
+{
+	CallstackProfiler::setRootNode(root);
 }
 
 void MemoryProfiler::begin(const char name[])
@@ -98,3 +164,7 @@ MemoryProfiler& MemoryProfiler::singleton()
 	static MemoryProfiler instance;
 	return instance;
 }
+
+
+
+
