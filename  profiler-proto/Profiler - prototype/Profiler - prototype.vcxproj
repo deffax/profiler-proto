@@ -86,6 +86,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CallstackProfiler.h" />
+    <ClInclude Include="functionPatcher.h" />
     <ClInclude Include="MemoryProfiler.h" />
     <ClInclude Include="NonCopyable.h" />
   </ItemGroup>
