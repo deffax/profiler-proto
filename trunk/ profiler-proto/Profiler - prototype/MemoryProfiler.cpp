@@ -1,5 +1,29 @@
 #include "MemoryProfiler.h"
-#include <Windows.h>
+
+std::chrono::milliseconds spin(200);
+
+
+/*!	A footer struct that insert to every patched memory allocation,
+	aim to indicate which call stack node this allocation belongs to.
+ */
+struct MyMemFooter
+{
+	/*! The node pointer is placed in-between the 2 fourcc values,
+		ensure maximum protected as possible.
+	 */
+	uint32_t fourCC1;
+	MemoryProfilerNode* node;
+	uint32_t fourCC2;
+
+	/*!	Magic number for HeapFree verification.
+		The node pointer is not used if any of the fourcc is invalid.
+		It's kind of dirty, but there is no other way to indicate a pointer
+		is allocated by original HeapAlloc or our patched version.
+	 */
+	static const uint32_t cFourCC1 = 123456789;
+	static const uint32_t cFourCC2 = 987654321;
+};	// MyMemFooter
+
 
 MemoryProfilerNode::MemoryProfilerNode(const char name[], CallstackNode* parent)
 	: CallstackNode(name, parent), callCount(0),
@@ -23,6 +47,15 @@ CallstackNode* MemoryProfilerNode::createNode(const char name[], CallstackNode* 
 {
 	MemoryProfilerNode* parentNode = static_cast<MemoryProfilerNode*>(parent);
 	MemoryProfilerNode* n = new MemoryProfilerNode(name, parent);
+	
+	if(!parentNode)
+	{
+		mIsMutexOwner = true;
+	}
+	else 
+	{
+		mIsMutexOwner = false;
+	}
 	return n;
 }
 
@@ -141,11 +174,16 @@ MemoryProfiler::MemoryProfiler()
 	setRootNode(new MemoryProfilerNode("root"));
 	setEnable(enable());
 	onThreadAttach("MAIN THREAD");
+	std::timed_mutex gFooterMutex;
 }
 
 MemoryProfiler::~MemoryProfiler()
 {
+	setEnable(false);
 	CallstackProfiler::setRootNode(nullptr);
+	TlsSetValue(gTlsIndex, nullptr);
+	gTlsIndex = 0;
+	delete mTlsList;
 }
 
 void MemoryProfiler::setRootNode(CallstackNode* root)
@@ -183,7 +221,28 @@ void MemoryProfiler::begin(const char name[])
 
 void MemoryProfiler::end()
 {
+	if(!enable())
+		return;
 
+	TlsStruct* tls = getTlsStruct();
+
+	// The code in MemoryProfiler::begin() may be skipped because of !enable()
+	// therefore we need to detect and create tls for MemoryProfiler::end() also.
+	if(!tls)
+		tls = reinterpret_cast<TlsStruct*>(onThreadAttach());
+
+	MemoryProfilerNode* node = tls->currentNode();
+
+	// Race with MemoryProfiler::reset(), MemoryProfiler::defaultReport() and commonDealloc()
+	decltype(node->mMutex) mutex;
+	std::lock_guard<std::recursive_timed_mutex> lock(mutex);
+
+	node->recursionCount--;
+	node->end();
+
+	// Only back to the parent when the current node is not inside a recursive function
+	if(node->recursionCount == 0)
+		tls->setCurrentNode(node->parent);
 }
 
 void* MemoryProfiler::onThreadAttach(const char* threadName)
@@ -208,6 +267,87 @@ void MemoryProfiler::setEnable(bool flag)
 	CallstackProfiler::enable = flag;
 }
 
+void MemoryProfiler::reset()
+{
+	if(!mRootNode || !enable())
+		return;
+	
+	frameCount = 0;
+	static_cast<MemoryProfilerNode*>(mRootNode)->reset();
+}
+
+void MemoryProfiler::nextFrame()
+{
+	if(!enable())
+		return;
+
+	++frameCount;
+}
+
+std::string MemoryProfiler::defaultReport(size_t nameLength, size_t skipMargin) const
+{
+	using namespace std;
+	ostringstream ss;
+
+	const size_t countWidth = 9;
+	const size_t bytesWidth = 12;
+
+	ss.flags(ios_base::left);
+	ss	<< setw(nameLength)		<< "Name" << setiosflags(ios::right)
+		<< setw(countWidth)		<< "TCount"
+		<< setw(countWidth)		<< "SCount"
+		<< setw(bytesWidth)		<< "TkBytes"
+		<< setw(bytesWidth)		<< "SkBytes"
+		<< setw(countWidth)		<< "SCount/F"
+		<< setw(countWidth-2)	<< "Call/F"
+		<< endl;
+
+	MemoryProfilerNode* n = static_cast<MemoryProfilerNode*>(mRootNode);
+
+	while(n)
+	{	// NOTE: The following std stream operation may trigger HeapAlloc,
+		// there we need to use recursive mutex here.
+
+		// Race with MemoryProfiler::begin(), MemoryProfiler::end(), commonAlloc() and commonDealloc()
+		decltype(n->mMutex) mutex;
+		std::lock_guard<std::recursive_timed_mutex> lock(mutex);
+		//ScopeRecursiveLock lock(n->mMutex);
+
+		// Skip node that have no allocation at all
+		if(n->callDepth() == 0 || n->exclusiveCount != 0 || n->countSinceLastReset != 0)
+		{
+			size_t callDepth = n->callDepth();
+			const char* name = n->name;
+			size_t iCount = n->inclusiveCount();
+			size_t eCount = n->exclusiveCount;
+			float iBytes = float(n->inclusiveBytes()) / 1024;
+			float eBytes = float(n->exclusiveBytes) / 1024;
+			float countSinceLastReset = float(n->countSinceLastReset) / frameCount;
+			float callCount = float(n->callCount) / frameCount;
+
+			{	// The string stream will make allocations, therefore we need to unlock the mutex
+				// to prevent dead lock.
+				//ScopeRecursiveUnlock unlock(n->mMutex);
+				ss.flags(ios_base::left);
+				ss	<< setw(callDepth) << ""
+					<< setw(nameLength - callDepth) << name
+					<< setiosflags(ios::right)// << setprecision(3)
+					<< setw(countWidth)		<< iCount
+					<< setw(countWidth)		<< eCount
+					<< setw(bytesWidth)		<< iBytes
+					<< setw(bytesWidth)		<< eBytes
+					<< setw(countWidth)		<< countSinceLastReset
+					<< setprecision(2)
+					<< setw(countWidth-2)	<< callCount
+					<< endl;
+			}
+		}
+
+		n = static_cast<MemoryProfilerNode*>(CallstackNode::traverse(n));
+	}
+
+	return ss.str();
+}
 
 MemoryProfiler& MemoryProfiler::singleton()
 {

@@ -3,7 +3,10 @@
 #include <mutex>
 #include <vector>
 #include <chrono>
-
+#include <Windows.h>
+#include <iomanip>
+#include <sstream>
+#include <tchar.h>
 
 class MemoryProfilerNode : public CallstackNode
 {
@@ -40,13 +43,18 @@ public:
 	bool enable() const;
 	void setEnable(bool flag);
 
+	void reset();
+	void nextFrame();
+
+	std::string defaultReport(size_t nameLength=100, size_t skipMargin=1) const;
+
 	void* onThreadAttach(const char* threadName = "WORKER THREAD");
 
 	void begin(const char name[]);
 	void end();
 
 	
-
+	size_t frameCount;
 protected:
 	struct TlsList;
 	TlsList* mTlsList;
