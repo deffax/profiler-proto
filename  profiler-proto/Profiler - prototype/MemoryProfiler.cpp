@@ -21,7 +21,9 @@ void MemoryProfilerNode::begin()
 
 CallstackNode* MemoryProfilerNode::createNode(const char name[], CallstackNode* parent)
 {
-	return new MemoryProfilerNode(name, parent);
+	MemoryProfilerNode* parentNode = static_cast<MemoryProfilerNode*>(parent);
+	MemoryProfilerNode* n = new MemoryProfilerNode(name, parent);
+	return n;
 }
 
 void MemoryProfilerNode::reset()
@@ -137,6 +139,8 @@ MemoryProfiler::MemoryProfiler()
 	gTlsIndex = TlsAlloc();
 
 	setRootNode(new MemoryProfilerNode("root"));
+	setEnable(enable());
+	onThreadAttach("MAIN THREAD");
 }
 
 MemoryProfiler::~MemoryProfiler()
@@ -151,6 +155,29 @@ void MemoryProfiler::setRootNode(CallstackNode* root)
 
 void MemoryProfiler::begin(const char name[])
 {
+	if(!enable())
+		return;
+
+	TlsStruct* tls = getTlsStruct();
+	if(!tls)
+		tls = reinterpret_cast<TlsStruct*>(onThreadAttach());
+	MemoryProfilerNode* node = tls->currentNode();
+
+	decltype(node->mMutex) mutex;
+	std::lock_guard<std::recursive_timed_mutex> lock(mutex);
+	if(name != node->name)
+	{
+		tls->recurseCount++;
+		node = static_cast<MemoryProfilerNode*>(node->getChildByName(name));
+		tls->recurseCount--;
+		
+		if(node->recursionCount == 0)
+			tls->setCurrentNode(node);
+	}
+
+	node->begin();
+	node->recursionCount++;
+
 	
 }
 
@@ -158,6 +185,29 @@ void MemoryProfiler::end()
 {
 
 }
+
+void* MemoryProfiler::onThreadAttach(const char* threadName)
+{
+	TlsStruct* tls = new TlsStruct(threadName);
+	{
+		decltype(mTlsList->mMutex) mutex;
+		std::lock_guard<std::timed_mutex> lock(mutex);
+		mTlsList->push_back(tls);
+	}
+	TlsSetValue(gTlsIndex, tls);
+	return tls;
+}
+
+bool MemoryProfiler::enable() const
+{
+	return CallstackProfiler::enable;
+}
+
+void MemoryProfiler::setEnable(bool flag)
+{
+	CallstackProfiler::enable = flag;
+}
+
 
 MemoryProfiler& MemoryProfiler::singleton()
 {

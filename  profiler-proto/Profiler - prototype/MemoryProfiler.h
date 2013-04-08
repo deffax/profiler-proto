@@ -37,6 +37,11 @@ public:
 
 	void setRootNode(CallstackNode* root);
 
+	bool enable() const;
+	void setEnable(bool flag);
+
+	void* onThreadAttach(const char* threadName = "WORKER THREAD");
+
 	void begin(const char name[]);
 	void end();
 
