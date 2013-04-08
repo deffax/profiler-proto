@@ -2,6 +2,8 @@
 
 typedef MemoryProfiler::Scope Scope;
 
+	
+
 void functionB()
 {
 	Scope s("functionB");
@@ -17,6 +19,8 @@ void functionA()
 
 int main()
 {
+	MemoryProfiler& memoryProfiler = MemoryProfiler::singleton();
+	memoryProfiler.setEnable(true);
 	functionA();
 	return 0;
 }
