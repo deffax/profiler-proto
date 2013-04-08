@@ -35,5 +35,8 @@
     <ClInclude Include="MemoryProfiler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="functionPatcher.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

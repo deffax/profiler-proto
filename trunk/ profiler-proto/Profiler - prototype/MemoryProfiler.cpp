@@ -1,6 +1,23 @@
 #include "MemoryProfiler.h"
+#include "functionPatcher.h"
 
 std::chrono::milliseconds spin(200);
+
+//function pointers typedefs
+typedef LPVOID (WINAPI *MyHeapAlloc)(HANDLE, DWORD, SIZE_T);
+typedef LPVOID (WINAPI *MyHeapReAlloc)(HANDLE, DWORD, LPVOID, SIZE_T);
+typedef LPVOID (WINAPI *MyHeapFree)(HANDLE, DWORD, LPVOID);
+
+LPVOID WINAPI myHeapAlloc(HANDLE, DWORD, SIZE_T);
+LPVOID WINAPI myHeapReAlloc(HANDLE, DWORD, LPVOID, SIZE_T);
+LPVOID WINAPI myHeapFree(HANDLE, DWORD, LPVOID);
+
+FunctionPatcher functionPatcher;
+MyHeapAlloc orgHeapAlloc;
+MyHeapReAlloc orgHeapReAlloc;
+MyHeapFree orgHeapFree;
+
+
 
 
 /*!	A footer struct that insert to every patched memory allocation,
@@ -264,7 +281,38 @@ bool MemoryProfiler::enable() const
 
 void MemoryProfiler::setEnable(bool flag)
 {
+	
 	CallstackProfiler::enable = flag;
+	functionPatcher.UnpatchAll();
+	if(flag)
+	{
+		const int prologueSize[] = {5, 5, 5};
+		HMODULE h = GetModuleHandle(_T("ntdll.dll"));
+		void* pAlloc, *pReAlloc, *pFree;
+		if(h)
+		{
+			pAlloc = GetProcAddress(h, "RtlAllocateHeap");
+			pReAlloc = GetProcAddress(h, "RtlReAllocateHeap");
+			pFree = GetProcAddress(h, "RtlFreeHeap");
+		}
+		else
+		{
+			pAlloc = &HeapAlloc;
+			pReAlloc = &HeapReAlloc;
+			pFree = & HeapFree;
+		}
+
+		// Back up the original function and then do patching
+		/*
+		orgHeapAlloc = (MyHeapAlloc) functionPatcher.copyPrologue(pAlloc, prologueSize[0]);
+		orgHeapReAlloc = (MyHeapReAlloc) functionPatcher.copyPrologue(pReAlloc, prologueSize[1]);
+		orgHeapFree = (MyHeapFree) functionPatcher.copyPrologue(pFree, prologueSize[2]);
+
+		functionPatcher.patch(pAlloc, &myHeapAlloc);
+		functionPatcher.patch(pReAlloc, &myHeapReAlloc);
+		functionPatcher.patch(pFree, &myHeapFree);*/
+	}
+
 }
 
 void MemoryProfiler::reset()
