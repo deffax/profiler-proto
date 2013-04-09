@@ -2,7 +2,7 @@
 #include "functionPatcher.h"
 
 std::chrono::milliseconds spin(200);
-
+std::timed_mutex gFooterMutex;
 //function pointers typedefs
 typedef LPVOID (WINAPI *MyHeapAlloc)(HANDLE, DWORD, SIZE_T);
 typedef LPVOID (WINAPI *MyHeapReAlloc)(HANDLE, DWORD, LPVOID, SIZE_T);
@@ -191,7 +191,7 @@ MemoryProfiler::MemoryProfiler()
 	setRootNode(new MemoryProfilerNode("root"));
 	setEnable(enable());
 	onThreadAttach("MAIN THREAD");
-	std::timed_mutex gFooterMutex;
+	
 }
 
 MemoryProfiler::~MemoryProfiler()
@@ -403,6 +403,82 @@ MemoryProfiler& MemoryProfiler::singleton()
 	return instance;
 }
 
+//hooked functions
+
+void* commonAlloc(TlsStruct* tls, void* p, size_t nBytes)
+{
+	MemoryProfilerNode* node = tls->currentNode();
+
+	{
+		decltype(node->mMutex) mutex;
+		std::lock_guard<std::recursive_timed_mutex> lock(mutex);
+		node->exclusiveCount++;
+		node->countSinceLastReset++;
+		node->exclusiveBytes += nBytes;
+	}
+
+	{
+		gFooterMutex.try_lock_for(spin);
+		MyMemFooter* footer = reinterpret_cast<MyMemFooter*>(nBytes + (char*)p);
+		footer->node = node;
+		footer->fourCC1 = MyMemFooter::cFourCC1;
+		footer->fourCC2 = MyMemFooter::cFourCC2;
+		gFooterMutex.unlock();
+	}
+	return p;
+}
+
+void commonDealloc(__in HANDLE hHeap, __in DWORD dwFlags, __deref LPVOID lpMem)
+{
+	if(!lpMem)
+		return;
+
+	size_t size = HeapSize(hHeap, dwFlags, lpMem) - sizeof(MyMemFooter);
+	gFooterMutex.try_lock_for(spin);
+	MyMemFooter* footer = (MyMemFooter*) (((char*)lpMem) + size);
+	if(footer->fourCC1 == MyMemFooter::cFourCC1 && footer->fourCC2 == MyMemFooter::cFourCC2)
+	{
+		footer->fourCC1 = footer->fourCC2 = 0;
+		MemoryProfilerNode* node = reinterpret_cast<MemoryProfilerNode*> (footer->node);
+	
+		{
+			gFooterMutex.unlock();
+			decltype(node->mMutex) mutex;
+			std::lock_guard<std::recursive_timed_mutex> lock2(mutex);
+			node->exclusiveCount--;
+			node->exclusiveBytes -= size;
+		}
+	}
+}
+
+LPVOID WINAPI myHeapAlloc(__in HANDLE hHeap, __in DWORD dwFlags, __in SIZE_T dwBytes)
+{
+	TlsStruct* tls = getTlsStruct();
+	if(!tls || tls->recurseCount > 0)
+		return orgHeapAlloc(hHeap, dwFlags, dwBytes);
+	tls->recurseCount++;
+	void* p = orgHeapAlloc(hHeap, dwFlags, dwBytes + sizeof(MyMemFooter));
+	tls->recurseCount--;
+	return commonAlloc(tls, p, dwBytes);
+}
+
+LPVOID WINAPI myHeapRealloc(__in HANDLE hHeap, __in DWORD dwFlags, __deref LPVOID lpMem, __in SIZE_T dwBytes)
+{
+	TlsStruct* tls = getTlsStruct();
+	if(!tls || tls->recurseCount > 0 || lpMem == nullptr)
+		return orgHeapReAlloc(hHeap, dwFlags, lpMem, dwBytes);
+	if(dwBytes == 0)
+		return orgHeapReAlloc(hHeap, dwFlags, lpMem, dwBytes);
+	tls->recurseCount++;
+	void* p = orgHeapReAlloc(hHeap, dwFlags, lpMem, dwBytes + sizeof(MyMemFooter));
+	tls->recurseCount--;
+	return commonAlloc(tls, p, dwBytes);
+}
 
 
+LPVOID WINAPI myHeapFree(__in HANDLE hHeap, __in DWORD dwFlags, __deref LPVOID lpMem)
+{
+	commonDealloc(hHeap, dwFlags, lpMem);
+	return orgHeapFree(hHeap, dwFlags, lpMem);
+}
 
