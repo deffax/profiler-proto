@@ -303,14 +303,14 @@ void MemoryProfiler::setEnable(bool flag)
 		}
 
 		// Back up the original function and then do patching
-		/*
+		
 		orgHeapAlloc = (MyHeapAlloc) functionPatcher.copyPrologue(pAlloc, prologueSize[0]);
 		orgHeapReAlloc = (MyHeapReAlloc) functionPatcher.copyPrologue(pReAlloc, prologueSize[1]);
 		orgHeapFree = (MyHeapFree) functionPatcher.copyPrologue(pFree, prologueSize[2]);
 
 		functionPatcher.patch(pAlloc, &myHeapAlloc);
 		functionPatcher.patch(pReAlloc, &myHeapReAlloc);
-		functionPatcher.patch(pFree, &myHeapFree);*/
+		functionPatcher.patch(pFree, &myHeapFree);
 	}
 
 }
@@ -462,7 +462,7 @@ LPVOID WINAPI myHeapAlloc(__in HANDLE hHeap, __in DWORD dwFlags, __in SIZE_T dwB
 	return commonAlloc(tls, p, dwBytes);
 }
 
-LPVOID WINAPI myHeapRealloc(__in HANDLE hHeap, __in DWORD dwFlags, __deref LPVOID lpMem, __in SIZE_T dwBytes)
+LPVOID WINAPI myHeapReAlloc(__in HANDLE hHeap, __in DWORD dwFlags, __deref LPVOID lpMem, __in SIZE_T dwBytes)
 {
 	TlsStruct* tls = getTlsStruct();
 	if(!tls || tls->recurseCount > 0 || lpMem == nullptr)
