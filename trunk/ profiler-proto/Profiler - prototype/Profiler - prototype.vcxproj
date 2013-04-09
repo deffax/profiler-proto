@@ -83,11 +83,13 @@
     <ClCompile Include="CallstackProfiler.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MemoryProfiler.cpp" />
+    <ClCompile Include="Mutex.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CallstackProfiler.h" />
     <ClInclude Include="functionPatcher.h" />
     <ClInclude Include="MemoryProfiler.h" />
+    <ClInclude Include="Mutex.h" />
     <ClInclude Include="NonCopyable.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
