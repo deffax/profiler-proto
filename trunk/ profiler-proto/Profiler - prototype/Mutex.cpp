@@ -1,6 +1,8 @@
 #include "Mutex.h"
 #include <Windows.h>
 
+
+//MUTEX
 Mutex::Mutex(int spinCount)
 {
 	if(spinCount< 0 || !::InitializeCriticalSectionAndSpinCount((LPCRITICAL_SECTION)&mMutex, spinCount))
@@ -33,3 +35,33 @@ bool Mutex::trylock()
 		return false;
 	}
 }
+
+//RECURSIVE MUTEX
+
+RecursiveMutex::RecursiveMutex(int spinCount)
+{
+	if(spinCount< 0 || !::InitializeCriticalSectionAndSpinCount((LPCRITICAL_SECTION)&mMutex, spinCount))
+		::InitializeCriticalSection((LPCRITICAL_SECTION)&mMutex);
+}
+
+RecursiveMutex::~RecursiveMutex()
+{
+	::DeleteCriticalSection((LPCRITICAL_SECTION)&mMutex);
+}
+
+void RecursiveMutex::lock()
+{
+	::EnterCriticalSection((LPCRITICAL_SECTION)&mMutex);
+}
+
+void RecursiveMutex::unlock()
+{
+	::LeaveCriticalSection((LPCRITICAL_SECTION)&mMutex);
+}
+
+bool RecursiveMutex::trylock()
+{
+	return ::TryEnterCriticalSection((LPCRITICAL_SECTION)&mMutex) >0;
+}
+
+
