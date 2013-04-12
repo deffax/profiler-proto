@@ -1,8 +1,9 @@
 #include "MemoryProfiler.h"
 #include "functionPatcher.h"
 
-std::chrono::milliseconds spin(200);
-std::timed_mutex gFooterMutex;
+//std::chrono::milliseconds spin(200);
+//std::timed_mutex gFooterMutex;
+Mutex* gFooterMutex = nullptr;
 //function pointers typedefs
 typedef LPVOID (WINAPI *MyHeapAlloc)(HANDLE, DWORD, SIZE_T);
 typedef LPVOID (WINAPI *MyHeapReAlloc)(HANDLE, DWORD, LPVOID, SIZE_T);
@@ -45,14 +46,14 @@ struct MyMemFooter
 MemoryProfilerNode::MemoryProfilerNode(const char name[], CallstackNode* parent)
 	: CallstackNode(name, parent), callCount(0),
 	exclusiveBytes(0), exclusiveCount(0), countSinceLastReset(0),
-	mIsMutexOwner(false)//, mMutex(nullptr)
+	mIsMutexOwner(false), mMutex(nullptr)
 {
 }
 
 MemoryProfilerNode::~MemoryProfilerNode()
 {
-	//if(mIsMutexOwner)
-		//delete mMutex;
+	if(mIsMutexOwner)
+		delete mMutex;
 }
 
 void MemoryProfilerNode::begin()
@@ -65,12 +66,14 @@ CallstackNode* MemoryProfilerNode::createNode(const char name[], CallstackNode* 
 	MemoryProfilerNode* parentNode = static_cast<MemoryProfilerNode*>(parent);
 	MemoryProfilerNode* n = new MemoryProfilerNode(name, parent);
 	
-	if(!parentNode)
+	if(!parentNode || parentNode->mMutex == nullptr)
 	{
+		n->mMutex = new RecursiveMutex();
 		mIsMutexOwner = true;
 	}
 	else 
 	{
+		n->mMutex = parentNode->mMutex;
 		mIsMutexOwner = false;
 	}
 	return n;
@@ -80,7 +83,8 @@ void MemoryProfilerNode::reset()
 {
 	MemoryProfilerNode* n1, *n2;
 	{
-		std::lock_guard<std::recursive_timed_mutex> lock(mMutex);
+		//std::lock_guard<std::recursive_timed_mutex> lock(mMutex);
+		ScopeRecursiveLock lock(mMutex);
 		callCount = 0;
 		countSinceLastReset = 0;
 		n1 = static_cast<MemoryProfilerNode*>(firstChild);
@@ -98,8 +102,9 @@ size_t MemoryProfilerNode::inclusiveCount() const
 		return total;
 	do
 	{
-		decltype(n->mMutex) mutex;
-		std::lock_guard<std::recursive_timed_mutex> lock(mutex);
+		//decltype(n->mMutex) mutex;
+		//std::lock_guard<std::recursive_timed_mutex> lock(mutex);
+		ScopeRecursiveLock lock(n->mMutex);
 		total += n->inclusiveCount();
 		n = static_cast<MemoryProfilerNode*>(n->sibling);
 	} while (n);
@@ -114,8 +119,9 @@ size_t MemoryProfilerNode::inclusiveBytes() const
 		return total;
 	do
 	{
-		decltype(n->mMutex) mutex;
-		std::lock_guard<std::recursive_timed_mutex> lock(mutex);
+		//decltype(n->mMutex) mutex;
+		//std::lock_guard<std::recursive_timed_mutex> lock(mutex);
+		ScopeRecursiveLock lock(n->mMutex);
 		total += n->inclusiveCount();
 		n = static_cast<MemoryProfilerNode*>(n->sibling);
 	} while (n);
@@ -177,7 +183,8 @@ struct MemoryProfiler::TlsList : public std::vector<TlsStruct*>
 		for(iterator i = begin(); i!= end(); ++i)
 			delete(*i);
 	}
-	std::timed_mutex mMutex;
+	//std::timed_mutex mMutex;
+	Mutex mutex;
 };
 
 
@@ -190,6 +197,7 @@ MemoryProfiler::MemoryProfiler()
 
 	setRootNode(new MemoryProfilerNode("root"));
 	setEnable(enable());
+	gFooterMutex = new Mutex(200);
 	onThreadAttach("MAIN THREAD");
 	
 }
@@ -200,12 +208,14 @@ MemoryProfiler::~MemoryProfiler()
 	CallstackProfiler::setRootNode(nullptr);
 	TlsSetValue(gTlsIndex, nullptr);
 	gTlsIndex = 0;
+	delete gFooterMutex;
 	delete mTlsList;
 }
 
 void MemoryProfiler::setRootNode(CallstackNode* root)
 {
 	CallstackProfiler::setRootNode(root);
+	reset();
 }
 
 void MemoryProfiler::begin(const char name[])
@@ -217,9 +227,10 @@ void MemoryProfiler::begin(const char name[])
 	if(!tls)
 		tls = reinterpret_cast<TlsStruct*>(onThreadAttach());
 	MemoryProfilerNode* node = tls->currentNode();
+	ScopeRecursiveLock lock(node->mMutex);
 
-	decltype(node->mMutex) mutex;
-	std::lock_guard<std::recursive_timed_mutex> lock(mutex);
+	//decltype(node->mMutex) mutex;
+	//std::lock_guard<std::recursive_timed_mutex> lock(mutex);
 	if(name != node->name)
 	{
 		tls->recurseCount++;
@@ -251,9 +262,9 @@ void MemoryProfiler::end()
 	MemoryProfilerNode* node = tls->currentNode();
 
 	// Race with MemoryProfiler::reset(), MemoryProfiler::defaultReport() and commonDealloc()
-	decltype(node->mMutex) mutex;
-	std::lock_guard<std::recursive_timed_mutex> lock(mutex);
-
+	//decltype(node->mMutex) mutex;
+	//std::lock_guard<std::recursive_timed_mutex> lock(mutex);
+	ScopeRecursiveLock lock(node->mMutex);
 	node->recursionCount--;
 	node->end();
 
@@ -266,8 +277,9 @@ void* MemoryProfiler::onThreadAttach(const char* threadName)
 {
 	TlsStruct* tls = new TlsStruct(threadName);
 	{
-		decltype(mTlsList->mMutex) mutex;
-		std::lock_guard<std::timed_mutex> lock(mutex);
+		//decltype(mTlsList->mMutex) mutex;
+		//std::lock_guard<std::timed_mutex> lock(mutex);
+		ScopeLock lock(mTlsList->mutex);
 		mTlsList->push_back(tls);
 	}
 	TlsSetValue(gTlsIndex, tls);
@@ -357,9 +369,9 @@ std::string MemoryProfiler::defaultReport(size_t nameLength, size_t skipMargin) 
 		// there we need to use recursive mutex here.
 
 		// Race with MemoryProfiler::begin(), MemoryProfiler::end(), commonAlloc() and commonDealloc()
-		decltype(n->mMutex) mutex;
-		std::lock_guard<std::recursive_timed_mutex> lock(mutex);
-		//ScopeRecursiveLock lock(n->mMutex);
+		//decltype(n->mMutex) mutex;
+		//std::lock_guard<std::recursive_timed_mutex> lock(mutex);
+		ScopeRecursiveLock lock(n->mMutex);
 
 		// Skip node that have no allocation at all
 		if(n->callDepth() == 0 || n->exclusiveCount != 0 || n->countSinceLastReset != 0)
@@ -375,7 +387,7 @@ std::string MemoryProfiler::defaultReport(size_t nameLength, size_t skipMargin) 
 
 			{	// The string stream will make allocations, therefore we need to unlock the mutex
 				// to prevent dead lock.
-				//ScopeRecursiveUnlock unlock(n->mMutex);
+				ScopeRecursiveUnLock unlock(n->mMutex);
 				ss.flags(ios_base::left);
 				ss	<< setw(callDepth) << ""
 					<< setw(nameLength - callDepth) << name
@@ -410,20 +422,22 @@ void* commonAlloc(TlsStruct* tls, void* p, size_t nBytes)
 	MemoryProfilerNode* node = tls->currentNode();
 
 	{
-		decltype(node->mMutex) mutex;
-		std::lock_guard<std::recursive_timed_mutex> lock(mutex);
+		//decltype(node->mMutex) mutex;
+		//std::lock_guard<std::recursive_timed_mutex> lock(mutex);
+		ScopeRecursiveLock lock(node->mMutex);
 		node->exclusiveCount++;
 		node->countSinceLastReset++;
 		node->exclusiveBytes += nBytes;
 	}
 
 	{
-		gFooterMutex.try_lock_for(spin);
+		//gFooterMutex.try_lock_for(spin);
+		ScopeLock lock(gFooterMutex);
 		MyMemFooter* footer = reinterpret_cast<MyMemFooter*>(nBytes + (char*)p);
 		footer->node = node;
 		footer->fourCC1 = MyMemFooter::cFourCC1;
 		footer->fourCC2 = MyMemFooter::cFourCC2;
-		gFooterMutex.unlock();
+		//gFooterMutex.unlock();
 	}
 	return p;
 }
@@ -434,7 +448,8 @@ void commonDealloc(__in HANDLE hHeap, __in DWORD dwFlags, __deref LPVOID lpMem)
 		return;
 
 	size_t size = HeapSize(hHeap, dwFlags, lpMem) - sizeof(MyMemFooter);
-	gFooterMutex.try_lock_for(spin);
+	//gFooterMutex.try_lock_for(spin);
+	ScopeLock lock1(*gFooterMutex);
 	MyMemFooter* footer = (MyMemFooter*) (((char*)lpMem) + size);
 	if(footer->fourCC1 == MyMemFooter::cFourCC1 && footer->fourCC2 == MyMemFooter::cFourCC2)
 	{
@@ -442,9 +457,11 @@ void commonDealloc(__in HANDLE hHeap, __in DWORD dwFlags, __deref LPVOID lpMem)
 		MemoryProfilerNode* node = reinterpret_cast<MemoryProfilerNode*> (footer->node);
 	
 		{
-			gFooterMutex.unlock();
-			decltype(node->mMutex) mutex;
-			std::lock_guard<std::recursive_timed_mutex> lock2(mutex);
+			//gFooterMutex.unlock();
+			//decltype(node->mMutex) mutex;
+			//std::lock_guard<std::recursive_timed_mutex> lock2(mutex);
+			ScopeUnLock unlock(gFooterMutex);
+			ScopeRecursiveLock lock2(node->mMutex);
 			node->exclusiveCount--;
 			node->exclusiveBytes -= size;
 		}
