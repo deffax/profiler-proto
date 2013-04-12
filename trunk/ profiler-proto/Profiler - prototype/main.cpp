@@ -55,6 +55,7 @@ void functionA()
 
 
 //MUTEX TEST
+/*
 class counter
 {
 public:
@@ -103,12 +104,12 @@ int main()
 	system("pause");
 	return 0;
 }
-
-/* MEMORY PROFILER TEST
+*/
+//MEMORY PROFILER TEST
 int main()
 {
 	MemoryProfiler& memoryProfiler = MemoryProfiler::singleton();
 	memoryProfiler.setEnable(true);
 	functionA();
 	return 0;
-}*/
+}

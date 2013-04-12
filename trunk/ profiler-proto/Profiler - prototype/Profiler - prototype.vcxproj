@@ -84,6 +84,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MemoryProfiler.cpp" />
     <ClCompile Include="Mutex.cpp" />
+    <ClCompile Include="Timer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CallstackProfiler.h" />
@@ -91,6 +92,7 @@
     <ClInclude Include="MemoryProfiler.h" />
     <ClInclude Include="Mutex.h" />
     <ClInclude Include="NonCopyable.h" />
+    <ClInclude Include="Timer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
