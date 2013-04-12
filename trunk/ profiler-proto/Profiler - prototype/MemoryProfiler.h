@@ -1,6 +1,7 @@
 #pragma once
 #include "CallstackProfiler.h"
-#include <mutex>
+//#include <mutex>
+#include "Mutex.h"
 #include <vector>
 #include <chrono>
 #include <Windows.h>
@@ -27,7 +28,8 @@ public:
 	size_t callCount;
 	size_t countSinceLastReset;
 	bool mIsMutexOwner;
-	std::recursive_timed_mutex mMutex;
+	//std::recursive_timed_mutex mMutex;
+	RecursiveMutex* mMutex;
 };
 
 class MemoryProfiler : public CallstackProfiler
