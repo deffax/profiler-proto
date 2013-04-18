@@ -31,7 +31,7 @@ void Thread::init()
 {
 	mRunnable = nullptr;
 
-//	mHandle = nullptr;
+	mHandle = nullptr;
 	mId = 0;
 
 	mPriority = NormalPriority;
@@ -69,7 +69,7 @@ void Thread::start(IRunnable& runnable, bool autoDeleteRunnable)
 
 
 	
-	mHandle = reinterpret_cast<intptr_t>(::CreateThread(nullptr, 0, &_Run, this, 0, (LPDWORD)&mId));
+	mHandle = reinterpret_cast<void*>(::CreateThread(nullptr, 0, &_Run, this, 0, (LPDWORD)&mId));
 	if(!mHandle)
 
 		std::cout << "Warning: Error creating thread\n";
