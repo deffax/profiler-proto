@@ -192,49 +192,6 @@ public:
 //	return 0;
 //}*/
 
-//ATOMIC TEST!
-//#include <atomic>
-//#include "Atomic.h"
-//
-//struct AtomicCounter {
-//    //std::atomic<int> value;
-//	
-//	AtomicInteger value;
-//	//int value;
-//    void increment(){
-//        ++value;
-//    }
-//
-//    void decrement(){
-//        --value;
-//    }
-//
-//    int get(){
-//        //return value.load();
-//		return value;
-//    }
-//};
-//
-//int main(){
-//    AtomicCounter counter;
-//
-//    std::vector<std::thread> threads;
-//    for(int i = 0; i < 10; ++i){
-//        threads.push_back(std::thread([&counter](){
-//            for(int i = 0; i < 500; ++i){
-//                counter.increment();
-//            }
-//        }));
-//    }
-//
-//    for(auto& thread : threads){
-//        thread.join();
-//    }
-//
-//    std::cout << counter.get() << std::endl;
-//	system("pause");
-//    return 0;
-//}
 
 #include "Thread.h"
 
@@ -365,10 +322,10 @@ int main()
 	LoopRunnable runnable1, runnable2, runnable3;
 	Thread thread1(runnable1, false);
 	thread1.setPriority(Thread::NormalPriority);
-//	Thread thread2(runnable2, false);
-//	thread2.setPriority(Thread::LowPriority);
-//	Thread thread3(runnable3, false);
-//	thread3.setPriority(Thread::LowPriority);
+	//Thread thread2(runnable2, false);
+	//thread2.setPriority(Thread::LowPriority);
+	//Thread thread3(runnable3, false);
+	//thread3.setPriority(Thread::LowPriority);
 
 	while(true) {
 		obj.functionA();

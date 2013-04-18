@@ -1,7 +1,8 @@
 #pragma once
 #include "NonCopyable.h"
-#include "Atomic.h"
+#include "Mutex.h"
 #include <stdexcept>
+#include <atomic>
 
 typedef unsigned int useconds_t;
 
@@ -53,7 +54,8 @@ protected:
 	//intptr_t mHandle;
 	Priority mPriority;
 	bool mAutoDeleteRunnable;
-	AtomicValue<bool> mKeepRun;
+	//AtomicValue<bool> mKeepRun;
+	std::atomic<bool> mKeepRun;
 	mutable RecursiveMutex mMutex;
 }; //Thread
 
