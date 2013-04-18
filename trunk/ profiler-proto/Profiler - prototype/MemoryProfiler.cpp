@@ -391,7 +391,7 @@ std::string MemoryProfiler::defaultReport(size_t nameLength, size_t skipMargin) 
 				ss.flags(ios_base::left);
 				ss	<< setw(callDepth) << ""
 					<< setw(nameLength - callDepth) << name
-					<< setiosflags(ios::right)// << setprecision(3)
+					<< setiosflags(ios::right) << setprecision(2)
 					<< setw(countWidth)		<< iCount
 					<< setw(countWidth)		<< eCount
 					<< setw(bytesWidth)		<< iBytes
