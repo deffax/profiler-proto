@@ -198,7 +198,7 @@ MemoryProfiler::MemoryProfiler()
 	setRootNode(new MemoryProfilerNode("root"));
 	setEnable(enable());
 	gFooterMutex = new Mutex(200);
-	onThreadAttach("MAIN THREAD");
+	//onThreadAttach("MAIN THREAD");
 	
 }
 

@@ -81,6 +81,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="CallstackProfiler.cpp" />
+    <ClCompile Include="testMemoryProfiler.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MemoryProfiler.cpp" />
     <ClCompile Include="Mutex.cpp" />
