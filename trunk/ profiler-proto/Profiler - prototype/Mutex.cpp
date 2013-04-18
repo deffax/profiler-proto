@@ -1,5 +1,5 @@
 #include "Mutex.h"
-#include <Windows.h>
+#include "PlatformInclude.h"
 
 
 //MUTEX

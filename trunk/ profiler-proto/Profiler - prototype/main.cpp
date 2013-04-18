@@ -75,7 +75,7 @@ public:
 		{
 			void* b = malloc(2);
 			
-			//free(b);
+			//free(b); //mem lick
 			
 		}
 		FB();
