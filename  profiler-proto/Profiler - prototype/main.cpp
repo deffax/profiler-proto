@@ -1,56 +1,14 @@
 #include "MemoryProfiler.h"
 #include <iostream>
 #include "Mutex.h"
-//#include <mutex>
+
 #include <thread>
 #include <vector>
 #include <algorithm> //for_each
+#include "Timer.h"
+#include <list>
+#include <conio.h>	// For _kbhit()
 
-typedef MemoryProfiler::Scope Scope;
-
-	
-void functionC(void* newByFunB)
-{
-		Scope s("functionC");
-		delete[] newByFunB;
-		//recurse(10);
-		
-}
-
-void functionB()
-{
-		Scope s("functionB");
-		functionC(new int[10]);
-		//recurse1(10);
-	}
-
-
-void functionA()
-{
-		Scope s("functionA");
-
-		{	// Let's make some noise!
-			void* b = malloc(10);
-			free(b);
-
-			b = malloc(0);
-			free(b);
-			free(nullptr);
-
-			b = realloc(nullptr, 10);
-			b = realloc(b, 20);		// Most likely the memory pointer does not altered
-			b = realloc(b, 2000);	// Most likely the memory pointer is altered
-			b = realloc(b, 0);
-
-			b = calloc(10, 4);
-			free(b);
-			std::string s("hello world!");
-
-			
-		}
-
-		functionB();
-}
 
 
 
@@ -106,10 +64,174 @@ int main()
 }
 */
 //MEMORY PROFILER TEST
-int main()
+
+class TestObj
 {
-	MemoryProfiler& memoryProfiler = MemoryProfiler::singleton();
-	memoryProfiler.setEnable(true);
-	functionA();
-	return 0;
+	typedef MemoryProfiler::Scope Scope;
+public:
+	void FA()
+	{
+		Scope s("FA");
+		{
+			void* b = malloc(2);
+			
+			//free(b);
+			
+		}
+		FB();
+		FC();
+		//FD();
+	}
+
+	void FB()
+	{
+		Scope s("FB");
+		FE();
+		R1(3);
+	}
+
+	void FC()
+	{
+		Scope s("FC");
+	}
+
+	void FD()
+	{
+		Scope s("FD");
+		{
+			void* b = malloc(1);
+			//free(b);
+			void* c = malloc(1);
+			//void* d = malloc(1);
+			free(b);
+			free(c);
+			//free(d);
+		}
+	}
+
+	void FE()
+	{
+		Scope s("FE");
+
+	}
+
+	void R1(int count)
+	{
+		Scope s("R1");
+		if(count > 0)
+			R1(count -1);
+	}
+
+};
+
+//int main()
+//{
+//	MemoryProfiler& memoryProfiler = MemoryProfiler::singleton();
+//	memoryProfiler.setEnable(true);
+//	Timer timer;
+//	//Mutex mutex;
+//	//std::vector<std::thread> threads;
+//	TestObj obj;
+//	
+//	/*
+//	for(unsigned int i = 0; i < 1; ++i)
+//	{
+//		threads.push_back(std::thread([&obj, &memoryProfiler, &timer]() { 
+//			
+//				while(true)				
+//				{
+//				obj.functionA();
+//		
+//				memoryProfiler.nextFrame();
+//				if(timer.get().asSecond() > 1)
+//				{
+//					
+//					{	
+//						
+//						MemoryProfiler::Scope s("system(\"cls\")");
+//						::system("cls");
+//					}
+//					
+//					std::string s = memoryProfiler.defaultReport(20, 0);
+//					//std::cout << "Press any key to quit...\n\n";
+//					std::cout << s << std::endl;
+//					memoryProfiler.reset();
+//					timer.reset();
+//			
+//				}
+//		
+//				}
+//				
+//			 }));
+//	}
+//	*/
+//	while(true) {
+//		obj.FA();
+//		// Inform the profiler we move to the next iteration
+//		memoryProfiler.nextFrame();
+//
+//		// Refresh and display the profiling result every 1 second
+//		if(timer.get().asSecond() > 1) {
+//			{	MemoryProfiler::Scope s("system(\"cls\")");
+//				::system("cls");
+//			}
+//
+//			std::string s = memoryProfiler.defaultReport(20, 0);
+//			std::cout << "Press any key to quit...\n\n";
+//			std::cout << s << std::endl;
+//			memoryProfiler.reset();
+//			timer.reset();
+//
+//			if(_kbhit())
+//				return 0;
+//		}
+//	}
+//	
+//	//std::for_each(threads.begin(), threads.end(), std::mem_fn(&std::thread::join));
+//	system("pause");
+//	return 0;
+//}*/
+
+//ATOMIC TEST!
+#include <atomic>
+#include "Atomic.h"
+
+struct AtomicCounter {
+    //std::atomic<int> value;
+	
+	AtomicInteger value;
+	//int value;
+    void increment(){
+        ++value;
+    }
+
+    void decrement(){
+        --value;
+    }
+
+    int get(){
+        //return value.load();
+		return value;
+    }
+};
+
+int main(){
+    AtomicCounter counter;
+
+    std::vector<std::thread> threads;
+    for(int i = 0; i < 10; ++i){
+        threads.push_back(std::thread([&counter](){
+            for(int i = 0; i < 500; ++i){
+                counter.increment();
+            }
+        }));
+    }
+
+    for(auto& thread : threads){
+        thread.join();
+    }
+
+    std::cout << counter.get() << std::endl;
+	system("pause");
+    return 0;
 }
