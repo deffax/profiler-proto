@@ -49,7 +49,8 @@ protected:
 
 	IRunnable* mRunnable;
 	int mId;
-	intptr_t mHandle;
+	void* mHandle;
+	//intptr_t mHandle;
 	Priority mPriority;
 	bool mAutoDeleteRunnable;
 	AtomicValue<bool> mKeepRun;
