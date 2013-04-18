@@ -4,7 +4,7 @@
 #include "Mutex.h"
 #include <vector>
 #include <chrono>
-#include <Windows.h>
+#include "PlatformInclude.h"
 #include <iomanip>
 #include <sstream>
 #include <tchar.h>
